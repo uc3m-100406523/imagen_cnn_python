@@ -1379,3 +1379,364 @@ for i, sample_batched in enumerate(trainloader):
     if i == N-1:
         break
 ```
+
+## Definir CNN
+
+### Clase de la red (basada en LeNet)
+
+```Python
+class Net(nn.Module):
+
+    # En el inicializador vamos a especificar los bloques de cómputo que tienen parámetros a definir, es decir, las capas que serán necesarias. Los definimos de forma independiente (sin unir), pues de momento son bloques aislados y no forman una red.
+    def __init__(self):
+
+        super(Net, self).__init__()
+
+        # Capa convolucional:
+        #	- Canales in = 3 (la imagen de entrada tiene 3 canales RGB)
+        #	- 6 canales out
+        #	- Filtro de tamaño 5x5
+        self.conv1 = nn.Conv2d(3, 6, 5)
+
+        # Capa de Maxpooling con tamaño 2x2
+        self.pool = nn.MaxPool2d(2, 2)
+
+        # Capa convolucional:
+        #	- Canales in = 6 (de la capa anterior)
+        #	- 16 canales out
+        #	- Filtro de tamaño 5x5
+        self.conv2 = nn.Conv2d(6, 16, 5)
+
+        # Capa completamente conectada (y = Wx + b):
+        #	- Canales in = 16 * 5 * 5 (16 capa anterior, 5x5 es la dimensión de la imagen que llega a esta capa)
+        #	- Canales out = 120
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+
+        # Capa completamente conectada (y = Wx + b)
+        #	- Canales in = 120 (capa anterior)
+        #	- Canales out = 84
+        self.fc2 = nn.Linear(120, 84)
+
+        # Capa completamente conectada (y = Wx + b)
+        #	- Canales in = 84 (capa anterior)
+        #	- Canales out = 10 (tenemos 10 dígitos a clasificar)
+        self.fc3 = nn.Linear(84, 10)
+
+    # En "forward" definimos la estructura de la red a través de su grafo computacional. Es donde conectamos los bloques antes definidos y metemos otros más simples.
+    def forward(self, x):
+
+        # Entrada -> conv1 -> activación relu -> Max pooling sobre una ventana (2, 2) -> x
+        x = self.pool(F.relu(self.conv1(x)))
+
+        # x -> conv2 -> activación relu -> Max pooling sobre una ventana (2, 2) -> x
+        x = self.pool(F.relu(self.conv2(x)))
+
+        # Cambiamos la forma del tensor para vectorizarlo (16x6x6 -> 120) -> x
+        x = x.view(-1, 16 * 5 * 5)
+
+        # x -> fc1 -> relu -> x
+        x = F.relu(self.fc1(x))
+
+        # x -> fc2 -> relu -> x
+        x = F.relu(self.fc2(x))
+
+        # fc3
+        x = self.fc3(x)
+
+        return x
+```
+
+### Clase de la red (basada en AlexNet)
+
+```Python
+class CustomNet(nn.Module):
+
+    # En el inicializador vamos a especificar los bloques de cómputo que tienen parámetros a definir. Los definimos de forma independiente, de momento son bloques aislados y no forman una red.
+    def __init__(self):
+
+        super(CustomNet, self).__init__()
+
+        # Capa convolucional 1:
+        #	- Canales de entrada: 3
+        #	- Canales de salida: 96
+        #	- Tamaño del filtro: 11x11
+        #	- stride: 4
+        #	- pad: 0
+        self.conv1 = nn.Conv2d(
+            in_channels=3,
+            out_channels=96,
+            kernel_size=11,
+            stride=4,
+            padding=0
+        )
+
+        # Capa convolucional 2:
+        #	- Canales de entrada: 96
+        #	- Canales de salida: 256
+        #	- Tamaño del filtro: 5x5
+        #	- stride: 1
+        #	- pad: 2
+        self.conv2 = nn.Conv2d(
+            in_channels=96,
+            out_channels=256,
+            kernel_size=5,
+            stride=1,
+            padding=2
+        )
+
+        # Capa convolucional 3:
+        #	- Canales de entrada: 256
+        #	- Canales de salida: 384
+        #	- Tamaño del filtro: 3x3
+        #	- stride: 1
+        #	- pad: 1
+        self.conv3 = nn.Conv2d(
+            in_channels=256,
+            out_channels=384,
+            kernel_size=3,
+            stride=1,
+            padding=1
+        )
+
+        # Capa convolucional 4:
+        #	- Canales de entrada: 384
+        #	- Canales de salida: 384
+        #	- Tamaño del filtro: 3x3
+        #	- stride: 1
+        #	- pad: 1
+        self.conv4 = nn.Conv2d(
+            in_channels=384,
+            out_channels=384,
+            kernel_size=3,
+            stride=1,
+            padding=1
+        )
+
+        # Capa convolucional 5:
+        #	- Canales de entrada: 384
+        #	- Canales de salida: 256
+        #	- Tamaño del filtro: 3x3
+        #	- stride: 1
+        #	- pad: 1
+        self.conv5 = nn.Conv2d(
+            in_channels=384,
+            out_channels=256,
+            kernel_size=3,
+            stride=1,
+            padding=1
+        )
+
+        # Capa de "max pooling":
+        #	- Tamaño: 3x3
+        #	- stride: 2
+        self.pool = nn.MaxPool2d(kernel_size=3, stride=2)
+
+        # Capa completamente conectada de bajo nivel:
+        #	- Canales de entrada: 5 x 5 (dimensiones) x 256 (canales)
+        #	- Canales de salida: 4096
+        self.fc1 = nn.Linear(5*5*256, 4096)
+
+        # Capa completamente conectada de nivel medio:
+        #	- Canales de entrada: 4096 (capa anterior)
+        #	- Canales de salida: 4096
+        self.fc2 = nn.Linear(4096, 4096)
+
+        # Capa completamente conectada de alto nivel:
+        #	- Canales de entrada: 4096 (capa anterior)
+        #	- Canales de salida: 1000
+        self.fc3 = nn.Linear(4096, 1000)
+
+        # Capa completamente conectada de adaptación a las clases:
+        #	- Canales de entrada: 1000 (capa anterior)
+        #	- Canales de salida: 3 (tenemos 3 clases)
+        self.fc4 = nn.Linear(1000, 3)
+
+    # En forward definimos la red a través de su grafo computacional. Es donde conectamos los bloques antes definidos y metemos otros más simples.
+    def forward(self, x):
+
+        # Serie de transformaciones:
+        #	- Convolución 1. El tamaño de la salida será:
+        #		- Dimensiones: [ (224-11+2x0) / 4 ] + 1 = 54.25 -> 54
+        #		- Canales: 3 -> 96
+        #	- Activación ReLU
+        #	- "Max pooling". La dimensión de la salida será:
+        #		[ (54-3) / 2 ] + 1 = 26.5 -> 26
+        x = self.pool(F.relu(self.conv1(x)))
+
+        # Serie de transformaciones:
+        #	- Convolución 2. El tamaño de la salida será:
+        #		- Dimensiones: [ (26-5+2x2) / 1 ] + 1 = 26
+        #		- Canales: 96 -> 256
+        #	- Activación ReLU
+        #	- "Max pooling". La dimensión de la salida será:
+        #		[ (26-3) / 2 ] + 1 = 12.5 -> 12
+        x = self.pool(F.relu(self.conv2(x)))
+
+        # Serie de transformaciones:
+        #	- Convolución 3. El tamaño de la salida será:
+        #		- Dimensiones: [ (12-3+2x1) / 1 ] + 1 = 12
+        #		- Canales: 256 -> 384
+        #	- Activación ReLU
+        x = F.relu(self.conv3(x))
+
+        # Serie de transformaciones:
+        #	- Convolución 4. El tamaño de la salida será:
+        #		- Dimensiones: [ (12-3+2x1) / 1 ] + 1 = 12
+        #		- Canales: 384 -> 384
+        #	- Activación ReLU
+        x = F.relu(self.conv4(x))
+
+        # Serie de transformaciones:
+        #	- Convolución 5. El tamaño de la salida será:
+        #		- Dimensiones: [ (12-3+2x1) / 1 ] + 1 = 12
+        #		- Canales: 384 -> 256
+        #	- Activación ReLU
+        x = F.relu(self.conv5(x))
+
+        # "Max pooling". La dimensión de la salida será:
+        #	[ (12-3) / 2 ] + 1 = 5.5 -> 5
+        x = self.pool(x)
+
+        # Cambiamos la forma del tensor para vectorizarlo de 5x5x256 a 4096 en la primera capa totalmente conectada
+        x = x.view(-1, 5*5*256)
+
+        # Capa totalmente conectada 1 y activación ReLU
+        x = F.relu(self.fc1(x))
+
+        # Capa totalmente conectada 2 y activación ReLU
+        x = F.relu(self.fc2(x))
+
+        # Capa totalmente conectada 3
+        x = self.fc3(x)
+
+        # Capa totalmente conectada 4
+        x = self.fc4(x)
+
+        return x
+```
+
+### Creamos la red neuronal que entrenaremos
+
+```Python
+# Invocamos el constructor de la red (método init())
+net = Net()
+
+# Pasamos la red al dispositivo que estemos usando (GPU)
+net.to(device)
+```
+
+### Cargamos un modelo de red ya existente
+
+```Python
+# Con "pretrained=True" cargamos los pesos pre-entrenados en ImageNet, que tenía 1000 categorías de objetos
+net = models.alexnet(pretrained=True)
+
+# Imprimimos la estructura del modelo
+print(net)
+```
+
+### Hacemos *fine-tuning* en un problema
+
+```Python
+# Tenemos que ajustar la capa de salida para que proporcione otros scores en vez de los 1000 originales
+num_classes = len(train_dataset.classes)
+
+# Número de capas de la red sin contar la de entrada ni las totalmente conectadas
+num_layers = 8
+
+# Obtenemos el número de "features" en la capa anterior a la última
+num_ftrs = net.classifier[num_layers-2].in_features
+
+# Creamos una nueva capa nueva que sobreescribe a la anterior (los pesos se inicializan aleatoriamente)
+net.classifier[num_layers-2] = nn.Linear(num_ftrs, num_classes)
+
+# Imprimimos la estructura del modelo tras el cambio
+print(net)
+```
+
+### Parámetros de la red
+
+- Lista con los parámetros:
+
+    ```Python
+    # Obtenemos la lista
+    params = list(net.parameters())
+
+    # Número de parámetros
+    print("Número de parámetros de la red {:d}".format(len(params)))
+
+    # Tamaño de los parámetros:
+    for param in params:
+        print(param.size())
+    ```
+
+- También podemos relacionar los parámetros con los nombres de las capas:
+
+    ```Python
+    # Accedemos como un diccionario
+    params_dict = net.state_dict()
+
+    # Mostramos
+    print(params_dict["conv1.weight"].size())
+    print(params_dict["conv1.bias"].size())
+    ```
+
+- También podemos acceder a partir de las propias capas:
+
+    ```Python
+    print(net.conv1.weight.size())
+    print(net.conv1.bias.size())
+    ```
+
+### Dimensiones de los datos de la red
+
+```Python
+# Obtenemos un batch de datos:
+data = next(iter(train_dataloader))
+
+# Extraemos imágenes y etiquetas
+inputs = data["image"].to(device).float()
+labels = data["label"].to(device)
+
+# Mostramos el tamaño
+batchSize = labels.shape
+print("El tamaño del tensor que representa un batch de imágenes es {}".format(inputs.shape))
+
+# Lo pasamos por la red
+with torch.set_grad_enabled(False):
+    outputs = net(inputs)
+    print("El tamaño del tensor de salida es {}".format(outputs.shape))
+```
+
+### Función para visualizar modelo de la red
+
+```Python
+def visualize_model(model, num_images=6):
+
+    was_training = model.training
+    model.eval()
+    images_so_far = 0
+    fig = plt.figure()
+
+    with torch.no_grad():
+
+        for i, sample in enumerate(dataloaders["val"]):
+
+            inputs = sample["image"].to(device).float()
+            labels = sample["label"].to(device)
+
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+
+            for j in range(inputs.size()[0]):
+
+                images_so_far += 1
+                ax = plt.subplot(num_images//2, 2, images_so_far)
+                ax.axis("off")
+                ax.set_title("predicted: {}".format(class_names[preds[j]]))
+                imshow(inputs.cpu().data[j],"figura")
+
+                if images_so_far == num_images:
+                    model.train(mode=was_training)
+                    return model.train(mode=was_training)
+```
