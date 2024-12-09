@@ -1968,3 +1968,153 @@ net.load_state_dict(best_net_wts)
 ```Python
 torch.save(net.state_dict(), "<ruta al fichero PTH>")
 ```
+
+## Evaluación
+
+### Preparamos la evaluación
+
+```Python
+# Generamos una red vacía
+net_eval = Net()
+
+# Cargamos el modelo guardado
+net_eval.load_state_dict(torch.load("[ruta al fichero PTH]"))
+
+# La pasamos a GPU si es necesario
+net_eval.to(device)
+```
+
+### Salida
+
+```Python
+outputs = net_eval(images.to(device))
+```
+
+### Comprobamos cómo de segura está la red de sus decisiones
+
+```Python
+# Aplicamos un softmax a las salidas
+out_probs = F.softmax(outputs.data,dim=1)
+
+# Buscamos el valor máximo en las probs
+max_prob, predicted = torch.max(out_probs, 1)
+
+# Mostramos
+print("Predicted: ", " ".join("%5s %.3f%%" % (classes[predicted[j]], max_prob[j]) for j in range(batchSize)))
+```
+
+### Calcular la precisión (*accuracy*)
+
+```Python
+# Variables de cálculo
+correct = 0
+total = 0
+
+# Ponemos esta línea de código para evitar que torch registre las operaciones y calcule grads.
+with torch.no_grad():
+
+    for data in testloader:
+
+        images = data[0].to(device)
+        labels = data[1].to(device)
+
+        outputs = net_eval(images)
+
+        _, predicted = torch.max(outputs.data, 1)
+
+        total += labels.size(0)
+
+        correct += (predicted == labels).sum().item()
+
+print("La tasa de acierto (accuracy) del modelo sobre un conjunto de test de 10000 imágenes es: %.2f %%" % (100 * correct / total))
+```
+
+### Contabilizar de forma independiente las diferentes clases
+
+```Python
+# El número de imágenes de test será el tamaño del conjunto de test
+numTestImages = len(testset)
+
+# Inicializamos las variables
+class_pred = np.zeros((numTestImages,), dtype=int)
+class_gt = np.zeros((numTestImages,), dtype=int)
+iteration = 0
+
+# No calculamos grads
+with torch.no_grad():
+
+    # Recorremos "testloader"
+    for data in testloader:
+
+        images = data[0].to(device)
+        labels = data[1].to(device)
+
+        outputs = net_eval(images.to(device))
+
+        _, predicted = torch.max(outputs, 1)
+
+        class_pred[iteration*batchSize:(iteration+1)*batchSize] = predicted.cpu().numpy()
+        class_gt[iteration*batchSize:(iteration+1)*batchSize] = labels.cpu().numpy()
+
+        iteration += 1
+```
+
+### Matriz de confusión
+
+```Python
+# Obtenemos la matriz de confusión
+cm = confusion_matrix(class_gt, class_pred)
+
+# La mostramos
+print(cm)
+
+# La normalizamos para que cada fila sume 1 y así tenemos probs
+ncm = cm/cm.sum(axis=1)
+
+# Vamos a mostrar en porcentajes en vez de probs
+ncmd = ConfusionMatrixDisplay(100*ncm,display_labels=classes)
+ncmd.plot(xticks_rotation="vertical")
+plt.title("Matriz de confusion normalizada (%)")
+plt.show()
+```
+
+### Función para generar la matriz de testeo de una red
+
+```Python
+def test_model(model):
+
+    since = time.time()
+
+    numClasses = len(test_dataset.classes)
+
+    # Ponemos el modelo en modo evaluación
+    model.eval()
+
+    # Tamaño del conjunto de datos
+    numSamples = len(test_dataset)
+
+    # Creamos las variables que almacenarán las salidas y las etiquetas
+    outputs_m = np.zeros((numSamples,numClasses), dtype=np.float)
+    labels_m = np.zeros((numSamples,), dtype=np.int)
+    contSamples = 0
+
+    # Iteramos sobre los datos
+    for sample in test_dataloader:
+        inputs = sample["image"].to(device).float()
+
+        # Tamaño del batch
+        batchSize = inputs.shape[0]
+
+        # Paso forward
+        with torch.torch.no_grad():
+
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+
+            # Aplicamos un softmax a la salida
+            outputs = F.softmax(outputs.data, dim=1)
+            outputs_m[contSamples:contSamples+batchSize, ...] = outputs.cpu().numpy()
+            contSamples += batchSize
+
+    return outputs_m
+```
