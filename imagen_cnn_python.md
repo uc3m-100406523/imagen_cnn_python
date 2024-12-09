@@ -960,3 +960,218 @@ classes = ("Clase 1", "Clase 2", "Clase n")
 ```Python
 batchSize = 4
 ```
+
+
+## Cargar imágenes y conjuntos
+
+### Definimos las transformaciones que le vamos a aplicar a las imágenes de la base de datos
+
+- Opción 1:
+
+    ```Python
+    transform = transforms.Compose([
+
+        # Serie de transformaciones
+        transformacion_1(),
+        transformacion_1(),
+        transformacion_n(),
+
+        # Transformación a tensor
+        ToTensor(),
+
+        # Normalización
+        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    ```
+
+- Opción 2:
+
+    ```Python
+    transform = transforms.Compose([
+
+        transformacion_1(),
+        transformacion_1(),
+        transformacion_n(),
+
+        # Transformación a tensor
+        transforms.ToTensor(),
+
+        # Normalización
+        transforms.Normalize(
+            (0.5, 0.5, 0.5),
+            (0.5, 0.5, 0.5)
+        )
+    ])
+    ```
+
+### Definir los conjuntos de entrenamiento y testeo para una base de datos genérica
+
+```Python
+# Definimos el conjunto de entrenamiento a partir de una base de datos estándar (CIFAR10):
+# - Se almacenará en el directorio local "data" (root="./data").
+# - Lo descargaremos localmente (download=True).
+# - Aplicaremos las transformaciones que hemos decidido (transform=transform).
+trainset = torchvision.datasets.CIFAR10(root="./data", train=True, download=True, transform=transform)
+
+# Definimos el conjunto de testeo a partir de una base de datos estándar (CIFAR10):
+# - Se almacenará en el directorio local "data" (root="./data").
+# - Lo descargaremos localmente (download=True).
+# - Aplicaremos las transformaciones que hemos decidido (transform=transform).
+testset = torchvision.datasets.CIFAR10(root="./data", train=False, download=True, transform=transform)
+```
+
+### Uso de la clase *Dataset*
+
+La clase `torch.utils.data.Dataset` es una clase abstracta que representa un conjunto de datos cargado de una base de datos local. Para crear nuestro propio conjunto de datos en *pytorch* debemos heredar de dicha clase y sobreescribir los siguientes métodos:
+
+- `__init__`: Es el método constructor, encargado de leer e indexar la base de datos. Tiene los siguientes argumentos:
+
+    - `csv_file` (*string*): Ruta al fichero CSV con las anotaciones.
+
+    - `root_dir` (*string*): Directorio raíz donde encontraremos las carpetas "images" y "masks".
+
+    - `transform` (*callable*, *optional*): Transformaciones opcionales a realizar sobre las imágenes.
+
+    - `maxSize` (un número): Número máximo de imágenes a incluir en la base de datos, útil para ejecutar más rápido sobre un subconjunto de los datos. Si `maxSize=0`, se usan todos los datos.
+
+    - `classes` (lista): Lista con las clases de la base de datos.
+
+- `__len__`: Es el método que permite invocar `len(dataset)`, que nos devuelve el tamaño del conjunto de datos.
+
+- `__getitem__`: Es para soportar el indexado `dataset[i]` al referirnos a la muestra `i`.
+
+    Con *Dataset*, podemos crear los conjuntos de datos de nuestro problema de diagnóstico. Podemos leer el fichero CSV en el método de inicialización `__init__` pero dejar la lectura explícita de las imágenes para el método `__getitem__`. Esta aproximación es más eficiente en memoria porque todas las imágenes no se cargan en memoria al principio, sino que se van leyendo individualmente cuando es necesario.
+
+    Cada muestra de nuestro conjunto de datos (cuando invoquemos `dataset[i]`) va a ser un diccionario:
+
+    ```Python
+    {
+        "image": image,
+        "mask": mask,
+        "label": label
+    }
+    ```
+
+    Por otro lado, al definir el conjunto de datos, el constructor podrá también tomar un argumento opcional `transform` para que podamos añadir pre-procesado y técnicas de *data augmentation* que le aplicaremos a las imágenes cuando las solicitemos.
+
+La clase es la siguiente:
+
+```Python
+class MyDataset(Dataset):
+
+    # Sobreescribimos el método "__init__".
+    def __init__(self, csv_file, root_dir, transform=None, maxSize=0, classes):
+
+        # Definimos el conjunto de datos a partir del fichero CSV
+        self.dataset = pd.read_csv(csv_file, header=0, dtype={"id": str, "label": int})
+
+        # Se realizan las operaciones necesarias en el caso de que se haya definido un número máximo de imágenes.
+        if maxSize>0:
+
+            newDatasetSize = maxSize
+
+            # El nuevo conjunto de datos será una parte del antiguo seleccionada de manera aleatoria
+            idx = np.random.RandomState(seed=42).permutation(range(len(self.dataset)))
+            print(idx[0:newDatasetSize])
+            reduced_dataset = self.dataset.iloc[idx[0:newDatasetSize]]
+
+            # Se reajusta el conjunto de datos al límite impuesto
+            self.dataset = reduced_dataset.reset_index(drop=True)
+
+        # Se definen los directorios locales con los datos a trabajar
+        self.root_dir = root_dir # Directorio raíz
+        self.img_dir = os.path.join(root_dir, "images") # Directorio de imágenes
+        self.mask_dir = os.path.join(root_dir, "masks") # Directorio de máscaras (no todos los problemas lo requieren)
+
+        # Se definen las transformaciones
+        self.transform = transform
+
+        # Se definen las clases de la base de datos
+        self.classes = classes
+
+    # Sobreescribimos el método "__len__".
+    def __len__(self):
+
+        return len(self.dataset)
+
+    # Sobreescribimos el método "__getitem__".
+    def __getitem__(self, idx):
+
+        # Si es un tensor, se convierte a lista.
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        # Leemos la imagen.
+        img_name = os.path.join(self.img_dir, self.dataset.id[idx] + ".jpg")
+        image = io.imread(img_name)
+
+        # Leemos la máscara.
+        mask_name = os.path.join(self.mask_dir, self.dataset.id[idx] + ".png")
+        mask = io.imread(mask_name)
+
+        # La muestra será un triplete imagen-máscara-etiqueta.
+        sample = {
+            "image": image,
+            "mask": mask,
+            "label":  self.dataset.label[idx].astype(dtype=np.long)
+        }
+
+        # Se transforma la imagen si es necesario.
+        if self.transform:
+            sample = self.transform(sample)
+
+        return sample
+```
+
+### Para cargar un conjunto de datos con la clase *Dataset*
+
+```Python
+# Cargamos el conjunto da datos de entrenamiento
+trainset = MyDataset(
+    csv_file="data/DBtrain.csv",
+    root_dir="data",
+    transform=transform,
+    maxSize=500
+)
+
+# Cargamos el conjunto da datos de testeo
+testset = MyDataset(
+    csv_file="data/DBtest.csv",
+    root_dir="data",
+    transform=transform,
+    maxSize=500
+)
+
+# Cargamos el conjunto da datos de validación
+valset = MyDataset(
+    csv_file="data/DBval.csv",
+    root_dir="data",
+    transform=transform,
+    maxSize=500
+)
+```
+
+### Funciones de carga de las bases de datos
+
+```Python
+# Definimos la función de carga de datos para el entrenamiento:
+# - Le asignamos el set de entrenamiento.
+# - Definimos batches del tamaño indicado (batch_size=batchSize).
+# - Desordenamos las imágenes (shuffle=True).
+# - Usamos 2 cores para paralelizar la carga de datos y agilizar el proceso de lectura (num_workers=2).
+trainloader = DataLoader(trainset, batch_size=batchSize, shuffle=True, num_workers=2)
+
+# Definimos la función de carga de datos para el entrenamiento
+# - Le asignamos el set de entrenamiento.
+# - Definimos batches del tamaño indicado (batch_size=batchSize).
+# - En test no desordenamos (shuffle=False).
+# - Usamos 2 cores para paralelizar la carga de datos y agilizar el proceso de lectura (num_workers=2).
+testloader = DataLoader(testset, batch_size=batchSize, shuffle=False, num_workers=2)
+
+# Definimos la función de carga de datos para la validación
+# - Le asignamos el set de validación.
+# - Definimos batches del tamaño indicado (batch_size=batchSize).
+# - En test no desordenamos (shuffle=False).
+# - Usamos 2 cores para paralelizar la carga de datos y agilizar el proceso de lectura (num_workers=2).
+testloader = DataLoader(valset, batch_size=batchSize, shuffle=False, num_workers=2)
+```
