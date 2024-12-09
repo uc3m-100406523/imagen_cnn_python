@@ -1795,3 +1795,176 @@ ss = 7
 
 scheduler = lr_scheduler.StepLR(optimizer, step_size=ss, gamma=0.1)
 ```
+
+## Entrenamiento
+
+### Precalculamos el número de iteraciones
+
+```Python
+numTrainImages = len(trainset)
+numIters = np.ceil(numTrainImages/batchSize)
+```
+
+### Bucle de iteración
+
+```Python
+# Hacemos dos iteraciones completas (épocas) sobre la base de datos
+for epoch in range(2):
+
+    # Al principio de cada época, reinicializamos la pérdida total
+    running_loss = 0.0
+
+    # Iteramos sobre el cargador de datos, dividiendo la base de datos en batches de 4 imágenes. Comenzamos en la iteración i=0 (argumento opcional de "enumerate").
+    tic = time.perf_counter()
+    tict = time.perf_counter()
+    for i, data in enumerate(trainloader, 0):
+
+        # Lectura de datos: "data" es una dupla, dividimos los datos en entradas y etiquetas (y convertimos al device correspondiente)
+        inputs = data[0].to(device)
+        labels = data[1].to(device)
+
+        # Ponemos a cero los gradientes
+        optimizer.zero_grad()
+
+        # Paso "forward ": cálculo de las salidas (outputs) de la red (método "net()")
+        outputs = net(inputs)
+
+        # Evaluación de la función de pérdida (criterion) definida anteriormente
+        loss = criterion(outputs, labels)
+
+        # Paso "backward": cálculo de gradientes a partir de la función de pérdida (loss)
+        loss.backward()
+
+        # Actualizamos los pesos con el optimizador
+        optimizer.step()
+
+        # Acumulamos las pérdidas
+        running_loss += loss.item()
+
+        # Mostramos info detallada cada 2000 mini-batches
+        if i % 2000 == 1999:
+
+            # Contamos el tiempo pasado
+            toc = time.perf_counter()
+            time_ms = (toc-tic)*1000.0
+            print("[epoch %d, iter %5d/%5d] loss: %.3f avg_time: %.3f ms" %(epoch + 1, i + 1, numIters, running_loss / 2000, time_ms/2000))
+
+            # Reseteamos las pérdidas acumuladas
+            running_loss = 0.0
+
+            # Reseteamos el reloj
+            tic = time.perf_counter()
+
+# Información al término del entrenamiento
+toct = time.perf_counter()
+tot_time = toct-tict
+print("Entrenamiento finalizado en %.2f segs"%tot_time)
+```
+
+### *Buble* de iteración usando AUC
+
+```Python
+# Número de épocas a entrenar
+num_epochs = 25
+
+since = time.time()
+
+numClasses = len(image_datasets["train"].classes)
+
+# Usaremos el AUC y promedio
+best_net_wts = copy.deepcopy(net.state_dict())
+best_aucs = np.zeros((2,))
+best_auc = 0
+
+# Bucle de épocas de entrenamiento
+for epoch in range(num_epochs):
+
+    print("Epoch {}/{}".format(epoch, num_epochs - 1))
+    print("-" * 10)
+
+    # Cada época tiene entrenamiento y validación
+    for phase in ["train", "val"]:
+
+    if phase == "train":
+        net.train()  # Ponemos el modelo en modo entrenamiento
+    else:
+        net.eval()   # Ponemos el modelo en modo evaluación
+
+    # Tamaño del dataset
+    numSamples = dataset_sizes[phase]
+
+    # Creamos las variables que almacenarán las salidas y las etiquetas
+    outputs_m = np.zeros((numSamples,numClasses), dtype=np.float)
+    labels_m = np.zeros((numSamples,), dtype=np.int)
+    running_loss = 0.0
+
+    contSamples = 0
+
+    # Iteramos sobre los datos.
+    for sample in dataloaders[phase]:
+
+        inputs = sample["image"].to(device).float()
+        labels = sample["label"].to(device)
+
+        # Tamaño del batch
+        batchSize = labels.shape[0]
+
+        # Ponemos a cero los gradientes
+        optimizer.zero_grad()
+
+        # Paso forward. registramos operaciones solo en train
+        with torch.set_grad_enabled(phase == "train"):
+        outputs = net(inputs)
+        _, preds = torch.max(outputs, 1)
+        loss = criterion(outputs, labels)
+
+        # backward y optimización solo en training
+        if phase == "train":
+            loss.backward()
+            optimizer.step()
+
+        # Sacamos estadísticas y actualizamos variables
+        running_loss += loss.item() * inputs.size(0)
+
+        # Aplicamos un softmax a la salida
+        outputs = F.softmax(outputs.data, dim=1)
+        outputs_m [contSamples:contSamples+batchSize,...] = outputs.cpu().numpy()
+        labels_m [contSamples:contSamples+batchSize] = labels.cpu().numpy()
+        contSamples += batchSize
+
+    # Actualizamos la estrategia de lr
+    if phase == "train":
+        scheduler.step()
+
+    # Loss acumulada en la época
+    epoch_loss = running_loss / dataset_sizes[phase]
+
+    # Calculamos las AUCs
+    aucs = computeAUCs(outputs_m, labels_m)
+
+    # Y la promedio
+    epoch_auc = aucs.mean()
+
+    print("{} Loss: {:.4f} AUC elem1: {:.4f} elem2: {:.4f} avg: {:.4f}".format(phase, epoch_loss, aucs[0], aucs[1], epoch_auc))
+
+    # Copia profunda del mejor modelo
+    if phase == "val" and epoch_auc > best_auc:
+        best_auc = epoch_auc
+        best_aucs = aucs.copy()
+        best_net_wts = copy.deepcopy(net.state_dict())
+
+    print()
+
+time_elapsed = time.time() - since
+print("Training complete in {:.0f}m {:.0f}s".format(time_elapsed // 60, time_elapsed % 60))
+print("Best val AUCs: elem1 {:4f} elem2 {:4f} avg {:4f}".format(best_aucs[0], best_aucs[1], best_auc))
+
+# Cargamos los mejores pesos de la red
+net.load_state_dict(best_net_wts)
+```
+
+### Guardamos el modelo
+
+```Python
+torch.save(net.state_dict(), "<ruta al fichero PTH>")
+```
