@@ -140,3 +140,41 @@ plt.ion()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 ```
+
+
+
+## Utilidades varias
+
+### Generación de números aleatorios
+
+```Python
+random.seed(42)
+npr.seed(42)
+torch.manual_seed(42)
+```
+
+### Ignora las advertencias
+
+```Python
+warnings.filterwarnings("ignore")
+```
+
+### Extraer fichero
+
+```Python
+with zipfile.ZipFile("<RUTA>", "r") as zip_ref:
+    zip_ref.extractall("<DIRECTORIO DE SALIDA>")
+```
+
+### Leer fichero CSV
+
+```Python
+db = pd.read_csv(
+    "<RUTA>",
+    header=0,
+    dtype={
+        "Campo de cadena": str,
+        "Campo numérico": int
+    }
+)
+```
