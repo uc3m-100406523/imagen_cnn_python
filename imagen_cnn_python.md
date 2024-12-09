@@ -97,3 +97,29 @@ import pdb
 # Biblioteca de...
 from PIL import Image
 ```
+
+
+
+## Uso de cuadernos en *Google Colab*
+
+Mostrar las gráficas en el cuaderno
+
+```Python
+%matplotlib inline
+```
+
+Usar el sistemas de ficheros de Google Drive
+
+```Python
+# Se monta la unidad
+drive.mount("/content/drive")
+
+# Se muestra el directorio de trabajo actual
+print(os.getcwd())
+
+# Accedemos al directorio de trabajo
+os.chdir("<ruta al directorio>")
+
+# Copiar un fichero
+copyfile("<ruta al fichero de origen>", "<ruta al fichero de destino>")
+```
