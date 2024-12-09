@@ -1175,3 +1175,207 @@ testloader = DataLoader(testset, batch_size=batchSize, shuffle=False, num_worker
 # - Usamos 2 cores para paralelizar la carga de datos y agilizar el proceso de lectura (num_workers=2).
 testloader = DataLoader(valset, batch_size=batchSize, shuffle=False, num_workers=2)
 ```
+
+
+
+## Funciones y acciones útiles
+
+### Si usamos una base de datos local con estructura de fichero CSV, es de utilidad crear una variable que nos permite indexar las imágenes
+
+```Python
+# Leemos la base de datos
+db = pd.read_csv(
+    "<ruta al fichero CSV>",
+    header=0,
+    dtype={
+        "Campo de cadena": str,
+        "Campo numérico": int
+    }
+)
+```
+
+### Definimos una función que nos permite visualizar una imagen a partir de un tensor torch normalizado
+
+```Python
+def imshow_norm(img):
+
+    # Desnormalizamos el tensor torch
+    img = img/2 + 0.5
+
+    # Convertimos el tensor en una matriz numpy
+    npimg = img.numpy()
+
+    # Reordenamos dimensiones: el tensor torch es 3xHxW y pasa a HxWx3
+    plt.imshow(np.transpose(
+        npimg,
+        (1, 2, 0)
+    ))
+
+    # Lo mostramos
+    plt.show()
+```
+
+### Definimos una función que nos permite visualizar una imagen con un título
+
+```Python
+def imshow_prov(image, title_str):
+
+    if len(image.shape) > 2:
+        plt.imshow(image)
+
+    else:
+        plt.imshow(image, cmap=plt.cm.gray)
+
+    plt.title(title_str)
+```
+
+### Mostrar un batch de imágenes de entrenamiento
+
+```Python
+# Generamos un iterador sobre el cargador de imágenes
+dataiter = iter(trainloader)
+
+# Obtenemos las siguientes imágenes y sus etiquetas
+images, labels = next(dataiter)
+
+# El tensor "images" tiene dimensiones NxCxHxW, es decir:
+# - N imágenes en el batch
+# - C canales
+# - H,W dimensiones espaciales
+print("Tamaño de la imagen en NxCxHxW: " + str(images.size()))
+
+# Las mostramos (make_grid las concatena en un grid espacial para mostrarlas todas juntas)
+imshow_norm(torchvision.utils.make_grid(images))
+
+# Mostramos las etiquetas
+print(" ".join("%5s" % classes[labels[j]] for j in range(batchSize)))
+```
+
+### Mostrar un batch de imágenes de test
+
+```Python
+# Iteramos el test
+dataiter = iter(testloader)
+
+# Obtenemos imágenes y las etiquetas
+images, labels = next(dataiter)
+
+# El tensor "images" tiene dimensiones NxCxHxW, es decir:
+# - N imágenes en el batch
+# - C canales
+# - H,W dimensiones espaciales
+print("Tamaño de la imagen en NxCxHxW: " + str(images.size()))
+
+# Las mostramos (make_grid las concatena en un grid espacial para mostrarlas todas juntas)
+imshow_norm(torchvision.utils.make_grid(images))
+
+# Mostramos las etiquetas
+print("GroundTruth: ", " ".join("%5s" % classes[labels[j]] for j in range(batchSize)))
+```
+
+### Mostrar una imagen local
+
+```Python
+# Nueva figura
+plt.figure()
+
+# Mostramos la imagen
+imshow_prov(io.imread(os.path.join("<CARPETA DE IMÁGENES>/", img_id + ".jpg" )), "Imagen %d"%n)
+
+# Cargamos la gráfica
+plt.show()
+```
+
+### Mostramos los datos de la imagen indicada en una base de datos local
+
+```Python
+# Índice de la imagen
+n = 65
+
+# Obtenemos el ID y la etiqueta
+img_id = db.id[n]
+label = db.label[n]
+
+# Mostramos la información
+print("Mostrando datos de la imagen {}:".format(n))
+print("\t- Image ID: {}".format(img_id))
+print("\t- Label: {}".format(label))
+```
+
+### Mostrar imágenes de un conjunto cargado a la clase *Dataset*
+
+```Python
+# Creamos una figura
+fig = plt.figure()
+
+# Recorremos el conjunto de datos para mostrar el número indicado de muestras
+N = 4;
+for i in range(N):
+
+    # Accedemos a una muestra
+    sample = trainset[i]
+    print(i, sample["image"].shape, sample["label"])
+
+    # Mostramos la muestra
+    ax = plt.subplot(1, N, i + 1)
+    plt.tight_layout()
+    ax.set_title("Sample #{}".format(i))
+    ax.axis("off")
+    plt.imshow(sample["image"])
+
+    # Nos detenemos si alcanzamos la longitud de la base de datos
+    if i == len(trainset):
+        break
+
+# Mostramos la gráfica
+plt.show()
+```
+
+### Definimos una función auxiliar para visualizar un batch de datos
+
+```Python
+def show_batch(sample_batched):
+
+    # Mostramos un batch
+    images_batch, labels_batch = sample_batched["image"], sample_batched["label"]
+    batch_size = len(images_batch)
+    im_size = images_batch.size(2)
+    grid_border_size = 2
+
+    # Generamos el grid
+    grid = utils.make_grid(images_batch)
+
+    # Lo pasamos a numpy y lo desnormalizamos
+    grid = grid.numpy().transpose((1, 2, 0))
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    grid = std * grid + mean
+    grid = np.clip(grid, 0, 1)
+
+    # Mostramos el batch
+    plt.imshow(grid)
+    plt.title("Batch from dataloader")
+```
+
+### Mostramos varios batches del conjunto de datos de entrenamiento
+
+```Python
+# Cuántos batches vamos a mostrar
+N = 4
+
+# Iteramos en el conjunto de datos de entrenamiento
+for i, sample_batched in enumerate(trainloader):
+
+    print(i, sample_batched["image"].size(), sample_batched["label"])
+
+    # Mostramos cada batch en una sola figura
+    plt.figure()
+    show_batch(sample_batched)
+    plt.axis("off")
+    plt.ioff()
+    plt.show()
+
+    # Mostramos datos de los 4 primeros batches y paramos.
+    if i == N-1:
+        break
+```
