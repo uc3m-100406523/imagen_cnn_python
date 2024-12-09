@@ -1740,3 +1740,58 @@ def visualize_model(model, num_images=6):
                     model.train(mode=was_training)
                     return model.train(mode=was_training)
 ```
+
+## Función de pérdida y optimizador
+
+### Usando AUC
+
+```Python
+# Función que devuelve las AUCs de tres elementos. Argumentos:
+#	outputs (nx3): n el número de muestras en la base de datos
+#	labels (nx1)
+# La función devuelve un array de dos posiciones con los valores de las AUCs
+def computeAUCs(outputs, labels):
+
+    aucs = np.zeros((2,))
+
+    # Calculamos el AUC del primer elemento vs all
+    scores_mel = outputs[:, 1]
+    labels_mel = (labels == 1).astype(np.int)
+    aucs[0] = metrics.roc_auc_score(labels_mel, scores_mel)
+
+    # Calculamos el AUC del segundo elemento vs all
+    scores_sk = outputs[:, 2]
+    labels_sk = (labels == 2).astype(np.int)
+    aucs[1] = metrics.roc_auc_score(labels_sk, scores_sk)
+
+    return aucs
+```
+
+### Definimos la función de pérdida
+
+```Python
+criterion = nn.CrossEntropyLoss()
+```
+
+### Definimos el optimizador
+
+```Python
+# Optimizador
+
+# "Learning rate" de 1·10^(-3)
+lr = 0.001
+
+# Momento de 0.9
+momentum = 0.9
+
+optimizer = optim.SGD(net.parameters(), lr=lr, momentum=momentum)
+```
+
+### *Scheduler*
+
+```Python
+# Cada cuántas épocas decae el "learning rate"
+ss = 7
+
+scheduler = lr_scheduler.StepLR(optimizer, step_size=ss, gamma=0.1)
+```
