@@ -102,13 +102,13 @@ from PIL import Image
 
 ## Uso de cuadernos en *Google Colab*
 
-Mostrar las gráficas en el cuaderno
+### Mostrar las gráficas en el cuaderno
 
 ```Python
 %matplotlib inline
 ```
 
-Usar el sistemas de ficheros de Google Drive
+### Usar el sistemas de ficheros de Google Drive
 
 ```Python
 # Se monta la unidad
