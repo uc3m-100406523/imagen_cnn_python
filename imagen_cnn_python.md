@@ -123,3 +123,20 @@ os.chdir("<ruta al directorio>")
 # Copiar un fichero
 copyfile("<ruta al fichero de origen>", "<ruta al fichero de destino>")
 ```
+
+
+
+## Uso de GPU
+
+### Modo interactivo
+
+```Python
+plt.ion()
+```
+
+### Se selecciona la GPU
+
+```Python
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
+```
