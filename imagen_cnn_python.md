@@ -944,3 +944,19 @@ composed = transforms.Compose([
     transformacion_n()
 ])
 ```
+
+
+
+## Parámetros del entrenamiento
+
+### Las clases de nuestra base de datos
+
+```Python
+classes = ("Clase 1", "Clase 2", "Clase n")
+```
+
+### Definimos el tamaño del *batch*, es decir, el tamaño del conjunto de muestras para calcular la dirección del gradiente, pues usaremos la estrategia *mini-batch SGD*
+
+```Python
+batchSize = 4
+```
