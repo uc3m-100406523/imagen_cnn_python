@@ -162,15 +162,15 @@ warnings.filterwarnings("ignore")
 ### Extraer fichero
 
 ```Python
-with zipfile.ZipFile("<RUTA>", "r") as zip_ref:
-    zip_ref.extractall("<DIRECTORIO DE SALIDA>")
+with zipfile.ZipFile("<ruta al fichero ZIP>", "r") as zip_ref:
+    zip_ref.extractall("<directorio de salida>")
 ```
 
 ### Leer fichero CSV
 
 ```Python
 db = pd.read_csv(
-    "<RUTA>",
+    "<ruta al fichero CSV>",
     header=0,
     dtype={
         "Campo de cadena": str,
@@ -1280,7 +1280,7 @@ print("GroundTruth: ", " ".join("%5s" % classes[labels[j]] for j in range(batchS
 plt.figure()
 
 # Mostramos la imagen
-imshow_prov(io.imread(os.path.join("<CARPETA DE IMÁGENES>/", img_id + ".jpg" )), "Imagen %d"%n)
+imshow_prov(io.imread(os.path.join("<directorio de imágenes>/", img_id + ".jpg" )), "Imagen %d"%n)
 
 # Cargamos la gráfica
 plt.show()
